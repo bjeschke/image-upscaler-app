@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import PhotoUploader from "./PhotoUploader";
 import ComparisonView from "./ComparisonView";
 import MascotCharacter from "./MascotCharacter";
+import Replicate from "replicate";
 
 const Home = () => {
   const [uploadedImage, setUploadedImage] = React.useState<string | null>(null);
@@ -10,21 +11,64 @@ const Home = () => {
     null,
   );
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
 
-  const handleImageUpload = (imageUrl: string) => {
+  const handleImageUpload = async (file: File) => {
+    const imageUrl = URL.createObjectURL(file);
     setUploadedImage(imageUrl);
+    setUploadedFile(file);
     setIsProcessing(true);
 
-    // Simulate processing delay
-    setTimeout(() => {
-      setProcessedImage(imageUrl); // In a real app, this would be the enhanced image URL
+    try {
+      // Convert file to base64
+      const base64 = await fileToBase64(file);
+
+      // Initialize Replicate (you'll need to add your API token as an env variable)
+      const replicate = new Replicate({
+        auth: import.meta.env.VITE_REPLICATE_API_TOKEN || "your-api-token-here",
+      });
+
+      // Run the upscaling model
+      const output = await replicate.run(
+        "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc972b6f777b50f2cb4454a6",
+        {
+          input: {
+            image: base64,
+            scale: 4,
+            face_enhance: false,
+          },
+        },
+      );
+
+      if (output && typeof output === "string") {
+        setProcessedImage(output);
+      } else {
+        console.error("Unexpected output format:", output);
+        // Fallback to original image if processing fails
+        setProcessedImage(imageUrl);
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      // Fallback to original image if processing fails
+      setProcessedImage(imageUrl);
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
   };
 
   const resetImages = () => {
     setUploadedImage(null);
     setProcessedImage(null);
+    setUploadedFile(null);
   };
 
   return (
@@ -43,10 +87,42 @@ const Home = () => {
             </div>
 
             <div className="relative">
-              <PhotoUploader onImageUpload={handleImageUpload} />
+              <PhotoUploader
+                onImageSelected={handleImageUpload}
+                isProcessing={isProcessing}
+              />
 
               <div className="absolute -bottom-10 -left-10">
                 <MascotCharacter type="camera" />
+              </div>
+            </div>
+          </div>
+        ) : isProcessing ? (
+          <div className="space-y-8">
+            <div className="text-center">
+              <h1 className="text-5xl font-bold text-white mb-2">ENHANCING</h1>
+              <h1 className="text-5xl font-bold text-white">YOUR PHOTO</h1>
+            </div>
+
+            <div className="relative flex flex-col items-center justify-center bg-white rounded-xl p-8 shadow-xl">
+              <div className="relative w-32 h-32 mb-6">
+                <div className="absolute inset-0 border-4 border-purple-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-purple-600 rounded-full border-t-transparent animate-spin"></div>
+                <div className="absolute inset-4 flex items-center justify-center">
+                  <MascotCharacter type="star" size="sm" animate={true} />
+                </div>
+              </div>
+
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-600 mb-2">
+                  Magic in Progress...
+                </p>
+                <p className="text-gray-600">Upscaling your image with AI</p>
+              </div>
+
+              <div className="mt-6 flex space-x-4">
+                <MascotCharacter type="camera" size="sm" animate={true} />
+                <MascotCharacter type="square" size="sm" animate={true} />
               </div>
             </div>
           </div>
@@ -61,8 +137,7 @@ const Home = () => {
               <ComparisonView
                 originalImage={uploadedImage}
                 enhancedImage={processedImage}
-                isProcessing={isProcessing}
-                onReset={resetImages}
+                onTryAnother={resetImages}
               />
 
               <div className="absolute -bottom-10 -left-10">
