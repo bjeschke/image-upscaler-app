@@ -25,12 +25,12 @@ const Home = () => {
 
       // Initialize Replicate (you'll need to add your API token as an env variable)
       const replicate = new Replicate({
-        auth: import.meta.env.VITE_REPLICATE_API_TOKEN || "your-api-token-here",
+        auth: process.env.NEXT_PUBLIC_REPLICATE_API_TOKEN,
       });
 
       // Run the upscaling model
       const output = await replicate.run(
-        "nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc972b6f777b50f2cb4454a6",
+          `${process.env.NEXT_PUBLIC_REPLICATE_MODEL}`,
         {
           input: {
             image: base64,
