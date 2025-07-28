@@ -69,13 +69,66 @@ const MascotCharacter: React.FC<MascotCharacterProps> = ({
 const ComparisonView = ({
   originalImage = "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&q=70",
   enhancedImage = "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&q=100",
-  onSave = () => console.log("Save image"),
-  onShare = () => console.log("Share image"),
+  onSave,
+  onShare,
   onTryAnother = () => console.log("Try another image"),
 }: ComparisonViewProps) => {
   const [activeTab, setActiveTab] = useState<"before" | "after" | "split">(
     "split",
   );
+
+  // Download functionality
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(enhancedImage);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `enhanced-image-${Date.now()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      if (onSave) onSave();
+    } catch (error) {
+      console.error("Error downloading image:", error);
+    }
+  };
+
+  // Share functionality
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        // Use native share API if available
+        const response = await fetch(enhancedImage);
+        const blob = await response.blob();
+        const file = new File([blob], `enhanced-image-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        });
+
+        await navigator.share({
+          title: "Enhanced Photo",
+          text: "Check out my enhanced photo!",
+          files: [file],
+        });
+      } else {
+        // Fallback: copy image URL to clipboard
+        await navigator.clipboard.writeText(enhancedImage);
+        alert("Image URL copied to clipboard!");
+      }
+      if (onShare) onShare();
+    } catch (error) {
+      console.error("Error sharing image:", error);
+      // Fallback: copy URL to clipboard
+      try {
+        await navigator.clipboard.writeText(enhancedImage);
+        alert("Image URL copied to clipboard!");
+      } catch (clipboardError) {
+        console.error("Error copying to clipboard:", clipboardError);
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto bg-gradient-to-b from-orange-400 to-orange-500 p-4 min-h-screen">
@@ -175,13 +228,13 @@ const ComparisonView = ({
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <Button
-          onClick={onSave}
+          onClick={handleDownload}
           className="bg-white text-orange-500 hover:bg-gray-100 font-bold py-3"
         >
-          Save Enhanced Image
+          Download Enhanced Image
         </Button>
         <Button
-          onClick={onShare}
+          onClick={handleShare}
           className="bg-white text-orange-500 hover:bg-gray-100 font-bold py-3"
         >
           Share
